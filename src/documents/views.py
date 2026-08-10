@@ -244,6 +244,7 @@ from paperless.serialisers import GroupSerializer
 from paperless.serialisers import UserSerializer
 from paperless.views import StandardPagination
 from paperless_ai.ai_classifier import get_ai_document_classification
+from paperless_ai.ai_classifier import get_llm_output_language
 from paperless_ai.chat import stream_chat_with_documents
 from paperless_ai.exceptions import LLMTimeoutError
 from paperless_ai.matching import extract_unmatched_names
@@ -653,20 +654,6 @@ class TagViewSet(PermissionsAwareDocumentCountMixin, ModelViewSet[Tag]):
         new_parent = tag.get_parent()
         if new_parent and old_parent != new_parent:
             update_document_parent_tags(tag, new_parent)
-
-
-def _get_llm_output_language(ai_config: AIConfig, request) -> str | None:
-    output_language = ai_config.llm_output_language
-    if (
-        not output_language
-        and hasattr(request.user, "ui_settings")
-        and isinstance(
-            request.user.ui_settings.settings,
-            dict,
-        )
-    ):
-        output_language = request.user.ui_settings.settings.get("language")
-    return output_language
 
 
 @extend_schema_view(**generate_object_with_permissions_schema(DocumentTypeSerializer))
@@ -1530,7 +1517,10 @@ class DocumentViewSet(
         if not ai_config.ai_enabled:
             return HttpResponseBadRequest("AI is required for this feature")
 
-        output_language = _get_llm_output_language(ai_config=ai_config, request=request)
+        output_language = get_llm_output_language(
+            ai_config=ai_config,
+            user=request.user,
+        )
         llm_cache_backend = ":".join(
             part
             for part in (
@@ -2275,7 +2265,10 @@ class ChatStreamingView(GenericAPIView[Any]):
                 id__in=permitted_document_ids(request.user),
             )
 
-        output_language = _get_llm_output_language(ai_config=ai_config, request=request)
+        output_language = get_llm_output_language(
+            ai_config=ai_config,
+            user=request.user,
+        )
 
         response = StreamingHttpResponse(
             stream_chat_with_documents(
