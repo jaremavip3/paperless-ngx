@@ -66,6 +66,7 @@ from documents.utils import compute_checksum
 from documents.utils import identity
 from documents.workflows.utils import get_workflows_for_trigger
 from paperless.config import AIConfig
+from paperless.config import RemoteOCRConfig
 from paperless.logging import consume_task_id
 from paperless.parsers import ParserContext
 from paperless.parsers.registry import get_parser_registry
@@ -337,10 +338,17 @@ def bulk_update_documents(document_ids) -> None:
 
 
 @shared_task
-def update_document_content_maybe_archive_file(document_id) -> None:
+def update_document_content_maybe_archive_file(
+    document_id,
+    *,
+    remote_ocr: bool = False,
+) -> None:
     """
     Re-creates OCR content and thumbnail for a document, and archive file if
     it exists.
+
+    Remote OCR is used only when the engine is configured to handle everything
+    or if explicitly asked for via ``remote_ocr``.
     """
     document = Document.objects.get(id=document_id)
 
@@ -350,6 +358,7 @@ def update_document_content_maybe_archive_file(document_id) -> None:
         mime_type,
         document.original_filename or "",
         document.source_path,
+        allow_remote=remote_ocr or RemoteOCRConfig().remote_ocr_by_default,
     )
 
     if not parser_class:
