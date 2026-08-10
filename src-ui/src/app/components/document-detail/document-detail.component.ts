@@ -97,6 +97,7 @@ import { ISODateAdapter } from 'src/app/utils/ngb-iso-date-adapter'
 import * as UTIF from 'utif'
 import { DocumentDetailFieldID } from '../admin/settings/settings.component'
 import { ConfirmDialogComponent } from '../common/confirm-dialog/confirm-dialog.component'
+import { ReprocessConfirmDialogComponent } from '../common/confirm-dialog/reprocess-confirm-dialog/reprocess-confirm-dialog.component'
 import { PasswordRemovalConfirmDialogComponent } from '../common/confirm-dialog/password-removal-confirm-dialog/password-removal-confirm-dialog.component'
 import { CustomFieldsDropdownComponent } from '../common/custom-fields-dropdown/custom-fields-dropdown.component'
 import { CorrespondentEditDialogComponent } from '../common/edit-dialog/correspondent-edit-dialog/correspondent-edit-dialog.component'
@@ -1402,7 +1403,7 @@ export class DocumentDetailComponent
   }
 
   reprocess() {
-    let modal = this.modalService.open(ConfirmDialogComponent, {
+    let modal = this.modalService.open(ReprocessConfirmDialogComponent, {
       backdrop: 'static',
     })
     modal.componentInstance.title = $localize`Reprocess confirm`
@@ -1413,7 +1414,10 @@ export class DocumentDetailComponent
     modal.componentInstance.confirmClicked.subscribe(() => {
       modal.componentInstance.buttonsEnabled = false
       this.documentsService
-        .reprocessDocuments({ documents: [this.document().id] })
+        .reprocessDocuments(
+          { documents: [this.document().id] },
+          modal.componentInstance.remoteOcr
+        )
         .subscribe({
           next: () => {
             this.toastService.showInfo(
