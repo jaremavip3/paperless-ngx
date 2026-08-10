@@ -339,16 +339,30 @@ def check_deprecated_v2_ocr_env_vars(
 
 @register()
 def check_remote_parser_configured(app_configs: Any, **kwargs: Any) -> list[Error]:
+    # Import here because checks.py runs before the app registry is ready
+    from paperless.models import RemoteOCRMode
+
+    errors = []
+
     if settings.REMOTE_OCR_ENGINE == "azureai" and not (
         settings.REMOTE_OCR_ENDPOINT and settings.REMOTE_OCR_API_KEY
     ):
-        return [
+        errors.append(
             Error(
                 "Azure AI remote parser requires endpoint and API key to be configured.",
             ),
-        ]
+        )
 
-    return []
+    valid_modes = {mode.value for mode in RemoteOCRMode}
+    if settings.REMOTE_OCR_MODE not in valid_modes:
+        errors.append(
+            Error(
+                f"PAPERLESS_REMOTE_OCR_MODE is set to {settings.REMOTE_OCR_MODE!r}, "
+                f"expected one of {sorted(valid_modes)}.",
+            ),
+        )
+
+    return errors
 
 
 def get_tesseract_langs():

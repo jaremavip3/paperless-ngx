@@ -655,6 +655,23 @@ class TestRemoteParserChecks:
             in msg.msg
         )
 
+    def test_valid_mode(self, settings: SettingsWrapper) -> None:
+        settings.REMOTE_OCR_ENGINE = None
+        settings.REMOTE_OCR_MODE = "workflow_only"
+
+        msgs = check_remote_parser_configured(None)
+
+        assert len(msgs) == 0
+
+    def test_invalid_mode(self, settings: SettingsWrapper) -> None:
+        settings.REMOTE_OCR_ENGINE = None
+        settings.REMOTE_OCR_MODE = "sometimes"
+
+        msgs = check_remote_parser_configured(None)
+
+        assert len(msgs) == 1
+        assert "PAPERLESS_REMOTE_OCR_MODE is set to 'sometimes'" in msgs[0].msg
+
 
 class TestTesseractChecks:
     def test_default_language(self) -> None:
