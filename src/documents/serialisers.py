@@ -3184,6 +3184,9 @@ class WorkflowActionSerializer(serializers.ModelSerializer[WorkflowAction]):
             "email",
             "webhook",
             "passwords",
+            "ai_suggestion_fields",
+            "ai_create_missing",
+            "ai_overwrite_existing",
         ]
 
     def validate(self, attrs):
@@ -3257,6 +3260,23 @@ class WorkflowActionSerializer(serializers.ModelSerializer[WorkflowAction]):
                     "Passwords are required for password removal actions",
                 )
 
+        if (
+            "type" in attrs
+            and attrs["type"] == WorkflowAction.WorkflowActionType.APPLY_AI_SUGGESTIONS
+        ):
+            fields = attrs.get("ai_suggestion_fields")
+            valid_fields = set(WorkflowAction.AISuggestionField.values)
+            if (
+                fields is None
+                or not isinstance(fields, list)
+                or len(fields) == 0
+                or any(field not in valid_fields for field in fields)
+            ):
+                raise serializers.ValidationError(
+                    "At least one valid field is required for apply AI "
+                    f"suggestions actions, options are: {sorted(valid_fields)}",
+                )
+
         return attrs
 
 
@@ -3293,6 +3313,20 @@ class WorkflowSerializer(serializers.ModelSerializer[Workflow]):
         ):
             raise serializers.ValidationError(
                 "Remote OCR actions require a consumption started trigger",
+            )
+
+        # Suggestions are made from the document content, which does not exist
+        # until after consumption has finished
+        if any(
+            action.get("type") == WorkflowAction.WorkflowActionType.APPLY_AI_SUGGESTIONS
+            for action in actions
+        ) and not any(
+            trigger.get("type") != WorkflowTrigger.WorkflowTriggerType.CONSUMPTION
+            for trigger in triggers
+        ):
+            raise serializers.ValidationError(
+                "Apply AI suggestions actions require a trigger other than "
+                "consumption started",
             )
 
         return attrs
