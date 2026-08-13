@@ -288,14 +288,17 @@ export class BulkEditorComponent
   private executeDocumentAction(
     modal: NgbModalRef,
     request: Observable<any>,
-    options: { deleteOriginals?: boolean } = {}
+    options: { clearSelection?: boolean; successMessage?: string } = {}
   ) {
     if (modal) {
       modal.componentInstance.buttonsEnabled.set(false)
     }
     request.pipe(first()).subscribe({
       next: () => {
-        this.handleOperationSuccess(modal, options.deleteOriginals ?? false)
+        this.handleOperationSuccess(modal, options.clearSelection ?? false)
+        if (options.successMessage) {
+          this.toastService.showInfo(options.successMessage)
+        }
       },
       error: (error) => this.handleOperationError(modal, error),
     })
@@ -986,7 +989,7 @@ export class BulkEditorComponent
         this.executeDocumentAction(
           modal,
           this.documentService.mergeDocuments(mergeDialog.documentIDs(), args),
-          { deleteOriginals: !!args.delete_originals }
+          { clearSelection: !!args.delete_originals }
         )
         this.toastService.showInfo(
           $localize`Merged document will be queued for consumption.`
@@ -1016,9 +1019,11 @@ export class BulkEditorComponent
             mergeDialog.documentIDs(),
             mergeDialog.rootDocumentID()
           ),
-          { deleteOriginals: true }
+          {
+            clearSelection: true,
+            successMessage: $localize`Documents merged as versions.`,
+          }
         )
-        this.toastService.showInfo($localize`Documents merged as versions.`)
       })
   }
 
