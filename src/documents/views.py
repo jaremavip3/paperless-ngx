@@ -233,6 +233,7 @@ from documents.versioning import get_latest_version_for_root
 from documents.versioning import get_request_version_param
 from documents.versioning import get_root_document
 from documents.versioning import resolve_requested_version_for_root
+from documents.versioning import versions_newest_first
 from paperless import version
 from paperless.celery import app as celery_app
 from paperless.config import AIConfig
@@ -1076,9 +1077,9 @@ class DocumentViewSet(
 
     def get_queryset(self):
         latest_version_content = Subquery(
-            Document.objects.filter(root_document=OuterRef("pk"))
-            .order_by("-id")
-            .values("content")[:1],
+            versions_newest_first(
+                Document.objects.filter(root_document=OuterRef("pk")),
+            ).values("content")[:1],
         )
         # A correlated subquery avoids the LEFT JOIN + Count() this used to
         # be, which forced a GROUP BY aggregate over every matching document
@@ -1114,6 +1115,7 @@ class DocumentViewSet(
                         "checksum",
                         "version_label",
                         "root_document_id",
+                        "version_index",
                     ),
                 ),
                 "tags",
@@ -2134,11 +2136,9 @@ class DocumentViewSet(
                 },
             )
 
-        current = (
-            Document.objects.filter(Q(id=root_doc.id) | Q(root_document=root_doc))
-            .order_by("-id")
-            .first()
-        )
+        current = versions_newest_first(
+            Document.objects.filter(Q(id=root_doc.id) | Q(root_document=root_doc)),
+        ).first()
 
         document_updated.send(
             sender=self.__class__,
