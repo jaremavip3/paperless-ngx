@@ -17,21 +17,24 @@ class TestSemanticDocumentHit:
 
     def test_with_chunk_text(self):
         hit = SemanticDocumentHit(
-            document_id=42, score=0.95, rank=1, best_chunk_text="some text",
+            document_id=42,
+            score=0.95,
+            rank=1,
+            best_chunk_text="some text",
         )
         assert hit.best_chunk_text == "some text"
 
 
 class TestSemanticSearchDocuments:
-    @patch("paperless_ai.search.AIConfig")
+    @patch("paperless.config.AIConfig")
     def test_returns_empty_when_index_disabled(self, mock_config_cls):
         mock_config = MagicMock()
         mock_config.llm_index_enabled = False
         mock_config_cls.return_value = mock_config
         assert semantic_search_documents("test query") == []
 
-    @patch("paperless_ai.search.AIConfig")
-    @patch("paperless_ai.search.get_embedding_model")
+    @patch("paperless.config.AIConfig")
+    @patch("paperless_ai.embedding.get_embedding_model")
     def test_returns_empty_on_embedding_failure(self, mock_get_model, mock_config_cls):
         mock_config = MagicMock()
         mock_config.llm_index_enabled = True
