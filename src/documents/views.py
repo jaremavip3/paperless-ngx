@@ -2568,7 +2568,10 @@ class UnifiedSearchViewSet(DocumentViewSet):
             mode: str,
         ) -> SearchResultPage:
             """Handle hybrid/semantic search with RRF fusion."""
-            query_str, search_mode = _get_tantivy_query_and_mode(request.query_params)
+            result = _get_tantivy_query_and_mode(request.query_params)
+            if result is None:
+                return run_text_search(backend, user, filtered_qs)
+            query_str, search_mode = result
             if not query_str:
                 # Fallback to keyword if no query text
                 return run_text_search(backend, user, filtered_qs)
