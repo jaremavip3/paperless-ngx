@@ -2656,6 +2656,21 @@ class UnifiedSearchViewSet(DocumentViewSet):
                 rank_start=page_offset + 1,
             )
             hit_map = {h["id"]: h for h in raw_hits}
+
+            missing_semantic_map = {}
+            if mode == RetrievalMode.HYBRID:
+                missing_ids = [
+                    doc_id for doc_id in page_ids if doc_id not in semantic_map
+                ]
+                if missing_ids:
+                    missing_hits = semantic_search_documents(
+                        query_str,
+                        document_ids=missing_ids,
+                        limit=len(missing_ids),
+                        chunk_k=max(200, len(missing_ids) * 10),
+                    )
+                    missing_semantic_map = {h.document_id: h for h in missing_hits}
+
             page_hits: list[SearchHit] = []
             for idx, doc_id in enumerate(page_ids):
                 sem_hit = semantic_map.get(doc_id)
@@ -2671,7 +2686,8 @@ class UnifiedSearchViewSet(DocumentViewSet):
                     score = sem_hit.score
                     search_type = "semantic"
                 else:
-                    score = None
+                    missing_hit = missing_semantic_map.get(doc_id)
+                    score = missing_hit.score if missing_hit is not None else None
                     search_type = "keyword"
 
                 page_hits.append(

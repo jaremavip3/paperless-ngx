@@ -106,6 +106,16 @@ a {
   color: #2dd4bf;
 }
 
+.keyword-score-value {
+  color: #6c757d;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+
+:host-context([data-bs-theme="dark"]) .keyword-score-value {
+  color: #9ca3af;
+}
+
 .keyword-match {
   color: #6c757d;
   font-weight: 500;
@@ -122,4 +132,5 @@ a {
     color: #9ca3af;
   }
 }
+
 

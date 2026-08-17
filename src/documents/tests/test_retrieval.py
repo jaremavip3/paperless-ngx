@@ -427,7 +427,7 @@ class TestSemanticSearchHighlightFallback:
         assert page_arg[2]["rank"] == 3
         assert page_arg[2]["highlights"] == {}
 
-    def test_hybrid_search_sets_semantic_score_for_semantic_and_none_for_keyword_only(
+    def test_hybrid_search_sets_semantic_score_for_semantic_and_computed_for_keyword_only(
         self,
     ):
         from unittest.mock import MagicMock
@@ -485,13 +485,25 @@ class TestSemanticSearchHighlightFallback:
             ),
         ]
 
+        def fake_semantic_search(query, document_ids=None, **kwargs):
+            if document_ids is not None:
+                return [
+                    SemanticDocumentHit(
+                        document_id=did,
+                        score=0.65,
+                        rank=1,
+                    )
+                    for did in document_ids
+                ]
+            return semantic_hits
+
         with (
             patch.object(UnifiedSearchViewSet, "get_queryset", return_value=mock_qs),
             patch.object(UnifiedSearchViewSet, "filter_queryset", return_value=mock_qs),
             patch("documents.search.get_backend", return_value=mock_backend),
             patch(
                 "paperless_ai.search.semantic_search_documents",
-                return_value=semantic_hits,
+                side_effect=fake_semantic_search,
             ),
             patch.object(UnifiedSearchViewSet, "get_serializer") as mock_ser,
         ):
@@ -507,9 +519,9 @@ class TestSemanticSearchHighlightFallback:
         assert hit2["search_type"] == "semantic"
         assert hit2["highlights"] == {"content": "<b>tuition</b> grant"}
 
-        # Doc 1 (keyword only) -> score is None, keeps keyword highlights
+        # Doc 1 (keyword only) -> score is 0.65 (computed), search_type is keyword
         hit1 = next(h for h in page_arg if h["id"] == 1)
-        assert hit1["score"] is None
+        assert hit1["score"] == 0.65
         assert hit1["search_type"] == "keyword"
         assert hit1["highlights"] == {"content": "<b>tuition</b> fee"}
 
