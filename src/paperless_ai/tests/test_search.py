@@ -1,9 +1,10 @@
 """Tests for semantic document retrieval."""
 
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
-from paperless_ai.search import SemanticDocumentHit, semantic_search_documents
+from paperless_ai.search import SemanticDocumentHit
+from paperless_ai.search import semantic_search_documents
 
 
 class TestSemanticDocumentHit:
@@ -16,7 +17,7 @@ class TestSemanticDocumentHit:
 
     def test_with_chunk_text(self):
         hit = SemanticDocumentHit(
-            document_id=42, score=0.95, rank=1, best_chunk_text="some text"
+            document_id=42, score=0.95, rank=1, best_chunk_text="some text",
         )
         assert hit.best_chunk_text == "some text"
 

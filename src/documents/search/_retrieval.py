@@ -11,12 +11,11 @@ import logging
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from django.contrib.auth.models import AbstractUser
-from django.db.models import QuerySet
-
-from documents.models import Document
-
 if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractUser
+    from django.db.models import QuerySet
+
+    from documents.models import Document
     from documents.search._backend import TantivyBackend
 
 logger = logging.getLogger("paperless.search")
@@ -79,7 +78,9 @@ def reciprocal_rank_fusion(
     for rank, doc_id in enumerate(semantic_ids, start=1):
         scores[doc_id] = scores.get(doc_id, 0.0) + semantic_weight / (k + rank)
 
-    return [doc_id for doc_id, _ in sorted(scores.items(), key=lambda x: x[1], reverse=True)]
+    return [
+        doc_id for doc_id, _ in sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    ]
 
 
 def hybrid_search(

@@ -1,11 +1,8 @@
 """Tests for hybrid search retrieval and RRF."""
 
-import pytest
 
-from documents.search._retrieval import (
-    RetrievalMode,
-    reciprocal_rank_fusion,
-)
+from documents.search._retrieval import RetrievalMode
+from documents.search._retrieval import reciprocal_rank_fusion
 
 
 class TestRetrievalMode:

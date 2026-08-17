@@ -11,17 +11,12 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from django.db.models import QuerySet
-
-from documents.models import Document
 from paperless_ai.embedding import get_embedding_model
-from paperless_ai.indexing import _document_id_filters, get_vector_store, read_store
+from paperless_ai.indexing import _document_id_filters
+from paperless_ai.indexing import read_store
 
 if TYPE_CHECKING:
-    from llama_index.core.vector_stores.types import (
-        MetadataFilters,
-        VectorStoreQuery,
-    )
+    from llama_index.core.vector_stores.types import MetadataFilters
 
 logger = logging.getLogger("paperless.search")
 
@@ -83,12 +78,7 @@ def semantic_search_documents(
         logger.warning("Failed to generate query embedding", exc_info=True)
         return []
 
-    from llama_index.core.vector_stores.types import (
-        FilterOperator,
-        MetadataFilter,
-        MetadataFilters,
-        VectorStoreQuery,
-    )
+    from llama_index.core.vector_stores.types import VectorStoreQuery
 
     filters: MetadataFilters | None = None
     if document_ids is not None:
@@ -103,7 +93,7 @@ def semantic_search_documents(
                     query_embedding=query_embedding,
                     similarity_top_k=chunk_k,
                     filters=filters,
-                )
+                ),
             )
     except Exception:
         logger.warning("Vector store query failed", exc_info=True)

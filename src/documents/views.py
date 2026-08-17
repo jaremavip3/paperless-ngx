@@ -2573,12 +2573,9 @@ class UnifiedSearchViewSet(DocumentViewSet):
                 # Fallback to keyword if no query text
                 return run_text_search(backend, user, filtered_qs)
 
-            from documents.search._retrieval import (
-                RetrievalMode,
-                hybrid_search,
-                SEMANTIC_CANDIDATE_K,
-                SEMANTIC_CHUNK_K,
-            )
+            from documents.search._retrieval import SEMANTIC_CHUNK_K
+            from documents.search._retrieval import RetrievalMode
+            from documents.search._retrieval import hybrid_search
             from paperless_ai.search import semantic_search_documents
 
             if mode == RetrievalMode.SEMANTIC:
@@ -2594,7 +2591,9 @@ class UnifiedSearchViewSet(DocumentViewSet):
                 if len(allowed_ids) > 32_700:
                     allowed_set = set(allowed_ids)
                     ordered_ids = [d for d in ordered_ids if d in allowed_set]
-                ordered_ids = intersect_and_order(ordered_ids, filtered_qs, use_tantivy_sort=True)
+                ordered_ids = intersect_and_order(
+                    ordered_ids, filtered_qs, use_tantivy_sort=True
+                )
             else:
                 # Hybrid: keyword + semantic with RRF
                 ordered_ids = hybrid_search(
