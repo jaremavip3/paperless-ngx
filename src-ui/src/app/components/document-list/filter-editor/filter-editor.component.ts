@@ -1124,6 +1124,44 @@ export class FilterEditorComponent
   @Output()
   resetFilterRules = new EventEmitter<FilterRule[]>()
 
+  @Output()
+  retrievalModeChange = new EventEmitter<string>()
+
+  retrievalMode: string = 'default'
+
+  @Input()
+  set incomingRetrievalMode(mode: string) {
+    if (mode) {
+      this.retrievalMode = mode
+    }
+  }
+
+  readonly retrievalModes = [
+    { id: 'default', name: $localize`Default` },
+    { id: 'hybrid', name: $localize`Hybrid` },
+    { id: 'semantic', name: $localize`Semantic` },
+  ]
+
+  get retrievalModeName(): string {
+    return (
+      this.retrievalModes.find((m) => m.id === this.retrievalMode)?.name ??
+      'Default'
+    )
+  }
+
+  get showRetrievalMode(): boolean {
+    return (
+      this.textFilterTarget === TEXT_FILTER_TARGET_TITLE_CONTENT ||
+      this.textFilterTarget === TEXT_FILTER_TARGET_FULLTEXT_QUERY
+    )
+  }
+
+  setRetrievalMode(mode: string) {
+    this.retrievalMode = mode
+    this.retrievalModeChange.emit(mode)
+    this.updateRules()
+  }
+
   @Input()
   set selectionData(selectionData: SelectionData) {
     this.tagDocumentCounts = selectionData?.selected_tags ?? null

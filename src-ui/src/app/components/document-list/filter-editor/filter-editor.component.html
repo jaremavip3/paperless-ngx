@@ -10,6 +10,16 @@
             }
           </div>
         </div>
+        @if (showRetrievalMode) {
+          <div ngbDropdown>
+            <button class="btn btn-sm btn-outline-secondary" ngbDropdownToggle>{{retrievalModeName}}</button>
+            <div class="dropdown-menu shadow" ngbDropdownMenu>
+              @for (m of retrievalModes; track m.id) {
+                <button ngbDropdownItem [class.active]="retrievalMode === m.id" (click)="setRetrievalMode(m.id)">{{m.name}}</button>
+              }
+            </div>
+          </div>
+        }
         @if (textFilterTarget === 'asn') {
           <select class="form-select flex-grow-0 w-auto" [(ngModel)]="textFilterModifier" (change)="textFilterModifierChange()">
             @for (m of textFilterModifiers; track m) {

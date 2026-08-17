@@ -37,6 +37,7 @@ const RESTORABLE_LIST_VIEW_STATE_KEYS: (keyof ListViewState)[] = [
   'pageSize',
   'displayMode',
   'displayFields',
+  'retrievalMode',
 ]
 
 /**
@@ -94,6 +95,11 @@ export interface ListViewState {
    * Display mode of the list view.
    */
   displayMode?: DisplayMode
+
+  /**
+   * Retrieval mode for search: 'default', 'hybrid', or 'semantic'.
+   */
+  retrievalMode?: string
 
   /**
    * The fields to display in the document list.
@@ -327,7 +333,14 @@ export class DocumentListViewService {
         activeListViewState.sortField,
         activeListViewState.sortReverse,
         activeListViewState.filterRules,
-        { truncate_content: true, include_selection_data: true }
+        {
+          truncate_content: true,
+          include_selection_data: true,
+          ...(activeListViewState.retrievalMode &&
+            activeListViewState.retrievalMode !== 'default' && {
+              retrieval_mode: activeListViewState.retrievalMode,
+            }),
+        }
       )
       .pipe(takeUntil(this.unsubscribeNotifier))
       .subscribe({
@@ -419,6 +432,17 @@ export class DocumentListViewService {
     this.reload()
     this.reduceSelectionToFilter()
     this.saveDocumentListView()
+  }
+
+  setRetrievalMode(mode: string) {
+    this.activeListViewState.retrievalMode = mode
+    this.markChanged()
+    this.reload()
+    this.saveDocumentListView()
+  }
+
+  get retrievalMode(): string {
+    return this.activeListViewState.retrievalMode ?? 'default'
   }
 
   get filterRules(): FilterRule[] {

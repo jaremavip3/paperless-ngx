@@ -23,6 +23,7 @@ import { ListViewState } from '../services/document-list-view.service'
 const SORT_FIELD_PARAMETER = 'sort'
 const SORT_REVERSE_PARAMETER = 'reverse'
 const PAGE_PARAMETER = 'page'
+const RETRIEVAL_MODE_PARAMETER = 'retrieval_mode'
 
 export function paramsFromViewState(
   viewState: ListViewState,
@@ -31,6 +32,9 @@ export function paramsFromViewState(
   let params = queryParamsFromFilterRules(viewState.filterRules)
   params[SORT_FIELD_PARAMETER] = viewState.sortField
   params[SORT_REVERSE_PARAMETER] = viewState.sortReverse ? 1 : undefined
+  if (viewState.retrievalMode && viewState.retrievalMode !== 'default') {
+    params[RETRIEVAL_MODE_PARAMETER] = viewState.retrievalMode
+  }
   if (pageOnly) params = {}
   params[PAGE_PARAMETER] = isNaN(viewState.currentPage)
     ? 1
@@ -49,11 +53,13 @@ export function paramsToViewState(queryParams: ParamMap): ListViewState {
   let currentPage = queryParams.has(PAGE_PARAMETER)
     ? parseInt(queryParams.get(PAGE_PARAMETER))
     : 1
+  let retrievalMode = queryParams.get(RETRIEVAL_MODE_PARAMETER) ?? 'default'
   return {
     currentPage: currentPage,
     filterRules: filterRules,
     sortField: sortField,
     sortReverse: sortReverse,
+    retrievalMode: retrievalMode,
   }
 }
 

@@ -240,6 +240,10 @@ export class DocumentListComponent
     this.list.setFilterRules(filterRules, true)
   }
 
+  onRetrievalModeChange(mode: string) {
+    this.list.setRetrievalMode(mode)
+  }
+
   get isBulkEditing(): boolean {
     return this.list.hasSelection
   }
