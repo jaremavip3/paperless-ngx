@@ -102,7 +102,7 @@ class SearchHit(TypedDict):
     """Type definition for search result hits."""
 
     id: int
-    score: float
+    score: float | None
     rank: int
     highlights: dict[str, str]
 

@@ -97,7 +97,11 @@ a {
 }
 
 .similarity-score-value {
-  color: var(--bs-teal, #20c997);
-  font-weight: 500;
-  font-size: 0.8em;
+  color: #0d9488;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+
+:host-context([data-bs-theme="dark"]) .similarity-score-value {
+  color: #2dd4bf;
 }

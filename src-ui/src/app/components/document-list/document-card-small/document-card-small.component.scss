@@ -109,10 +109,18 @@ a {
 }
 
 .similarity-score {
-  color: var(--bs-teal, #20c997);
-  font-weight: 500;
+  color: #0d9488;
+  font-weight: 600;
 
   i-bs {
-    color: var(--bs-teal, #20c997);
+    color: #0d9488;
+  }
+}
+
+:host-context([data-bs-theme="dark"]) .similarity-score {
+  color: #2dd4bf;
+
+  i-bs {
+    color: #2dd4bf;
   }
 }

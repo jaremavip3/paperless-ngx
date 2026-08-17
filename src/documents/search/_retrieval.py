@@ -8,6 +8,8 @@ vector store is modified — this module only orchestrates them.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
+from dataclasses import field
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
@@ -19,6 +21,7 @@ if TYPE_CHECKING:
 
     from documents.models import Document
     from documents.search._backend import TantivyBackend
+    from paperless_ai.search import SemanticDocumentHit
 
 logger = logging.getLogger("paperless.search")
 
@@ -29,6 +32,14 @@ class RetrievalMode(StrEnum):
     KEYWORD = "keyword"
     SEMANTIC = "semantic"
     HYBRID = "hybrid"
+
+
+@dataclass
+class HybridSearchResult:
+    """Result of a hybrid search containing fused IDs and semantic hit data."""
+
+    ordered_ids: list[int]
+    semantic_map: dict[int, SemanticDocumentHit] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +107,7 @@ def hybrid_search(
     semantic_limit: int = SEMANTIC_CANDIDATE_K,
     semantic_chunk_k: int = SEMANTIC_CHUNK_K,
     min_score: float | None = None,
-) -> list[int]:
+) -> HybridSearchResult:
     """Run keyword + semantic search and fuse with RRF.
 
     Parameters
@@ -123,9 +134,10 @@ def hybrid_search(
 
     Returns
     -------
-    list[int]
-        Fused document IDs sorted by RRF score, intersected with
-        ``filtered_qs`` visibility.
+    HybridSearchResult
+        Fused document IDs sorted by RRF score (intersected with
+        ``filtered_qs`` visibility) and a map of semantic hits keyed
+        by document ID for score display.
     """
     # --- Keyword search (Tantivy) ---
     keyword_ids = backend.search_ids(
@@ -146,6 +158,7 @@ def hybrid_search(
         min_score=min_score,
     )
     semantic_ids = [h.document_id for h in semantic_hits]
+    semantic_map = {h.document_id: h for h in semantic_hits}
     logger.debug("Semantic search returned %d documents", len(semantic_ids))
 
     # --- Fuse ---
@@ -155,7 +168,7 @@ def hybrid_search(
     # Intersect with the ORM queryset (preserves Django filter visibility).
     # Inline version of views.intersect_and_order (it's a nested function).
     if not fused_ids:
-        return []
+        return HybridSearchResult(ordered_ids=[], semantic_map=semantic_map)
     _INTERSECT_THRESHOLD = 5_000
     if len(fused_ids) <= _INTERSECT_THRESHOLD:
         visible_ids = set(
@@ -163,4 +176,5 @@ def hybrid_search(
         )
     else:
         visible_ids = set(filtered_qs.values_list("pk", flat=True))
-    return [doc_id for doc_id in fused_ids if doc_id in visible_ids]
+    ordered_ids = [doc_id for doc_id in fused_ids if doc_id in visible_ids]
+    return HybridSearchResult(ordered_ids=ordered_ids, semantic_map=semantic_map)

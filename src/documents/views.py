@@ -2629,7 +2629,7 @@ class UnifiedSearchViewSet(DocumentViewSet):
                 )
             else:
                 # Hybrid: keyword + semantic with RRF
-                ordered_ids = hybrid_search(
+                hybrid_result = hybrid_search(
                     query_str,
                     backend=backend,
                     user=user,
@@ -2637,6 +2637,8 @@ class UnifiedSearchViewSet(DocumentViewSet):
                     search_mode=search_mode,
                     min_score=min_score,
                 )
+                ordered_ids = hybrid_result.ordered_ids
+                semantic_map = hybrid_result.semantic_map
 
             page_offset = (page_num - 1) * page_size
             page_ids = ordered_ids[page_offset : page_offset + page_size]
@@ -2650,24 +2652,24 @@ class UnifiedSearchViewSet(DocumentViewSet):
             hit_map = {h["id"]: h for h in raw_hits}
             page_hits: list[SearchHit] = []
             for idx, doc_id in enumerate(page_ids):
-                if doc_id in hit_map:
-                    page_hits.append(hit_map[doc_id])
-                else:
-                    sem_hit = semantic_map.get(doc_id)
-                    highlights: dict[str, str] = {}
-                    score = 0.0
-                    if sem_hit is not None:
-                        score = sem_hit.score
-                        if sem_hit.best_chunk_text:
-                            highlights["content"] = sem_hit.best_chunk_text
-                    page_hits.append(
-                        SearchHit(
-                            id=doc_id,
-                            score=score,
-                            rank=page_offset + idx + 1,
-                            highlights=highlights,
-                        ),
-                    )
+                sem_hit = semantic_map.get(doc_id)
+                kw_hit = hit_map.get(doc_id)
+
+                highlights: dict[str, str] = {}
+                if kw_hit and kw_hit.get("highlights"):
+                    highlights = kw_hit["highlights"]
+                elif sem_hit and sem_hit.best_chunk_text:
+                    highlights["content"] = sem_hit.best_chunk_text
+
+                score: float | None = sem_hit.score if sem_hit is not None else None
+                page_hits.append(
+                    SearchHit(
+                        id=doc_id,
+                        score=score,
+                        rank=page_offset + idx + 1,
+                        highlights=highlights,
+                    ),
+                )
             return SearchResultPage(
                 ordered_ids=ordered_ids,
                 hits=page_hits,

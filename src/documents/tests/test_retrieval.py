@@ -93,7 +93,7 @@ class TestHybridSearch:
             chunk_k=200,
             min_score=None,
         )
-        assert result == [1, 2]
+        assert result.ordered_ids == [1, 2]
 
     def test_hybrid_search_passes_custom_search_mode(self):
         from unittest.mock import MagicMock
@@ -126,7 +126,7 @@ class TestHybridSearch:
             search_mode=SearchMode.TITLE,
             limit=200,
         )
-        assert result == [10]
+        assert result.ordered_ids == [10]
 
     def test_hybrid_search_passes_min_score(self):
         from unittest.mock import MagicMock
@@ -158,7 +158,7 @@ class TestHybridSearch:
             chunk_k=200,
             min_score=0.85,
         )
-        assert result == [1]
+        assert result.ordered_ids == [1]
 
     def test_hybrid_search_no_eager_document_ids_fetching(self):
         from unittest.mock import MagicMock
@@ -192,7 +192,8 @@ class TestHybridSearch:
             chunk_k=200,
             min_score=None,
         )
-        assert result == [2, 1]
+        assert result.ordered_ids == [2, 1]
+        assert result.semantic_map[2].score == 0.9
 
     def test_hybrid_search_post_intersection(self):
         from unittest.mock import MagicMock
@@ -218,7 +219,7 @@ class TestHybridSearch:
                 filtered_qs=filtered_qs,
             )
 
-        assert result == [1, 3]
+        assert result.ordered_ids == [1, 3]
 
     def test_hybrid_search_empty_fusion_returns_empty(self):
         from unittest.mock import MagicMock
@@ -242,7 +243,7 @@ class TestHybridSearch:
                 filtered_qs=filtered_qs,
             )
 
-        assert result == []
+        assert result.ordered_ids == []
 
     def test_hybrid_search_large_result_set_intersection(self):
         from unittest.mock import MagicMock
@@ -272,7 +273,7 @@ class TestHybridSearch:
 
         # Expected only even IDs, preserving order
         expected = [i for i in large_ids if i % 2 == 0]
-        assert result == expected
+        assert result.ordered_ids == expected
         filtered_qs.values_list.assert_called_once_with("pk", flat=True)
 
 
@@ -425,6 +426,95 @@ class TestSemanticSearchHighlightFallback:
         assert page_arg[2]["score"] == 0.82
         assert page_arg[2]["rank"] == 3
         assert page_arg[2]["highlights"] == {}
+
+    def test_hybrid_search_sets_semantic_score_for_semantic_and_none_for_keyword_only(
+        self,
+    ):
+        from unittest.mock import MagicMock
+        from unittest.mock import patch
+
+        from rest_framework.test import APIRequestFactory
+
+        from documents.search._backend import SearchHit
+        from documents.views import UnifiedSearchViewSet
+        from paperless_ai.search import SemanticDocumentHit
+
+        factory = APIRequestFactory()
+        view_func = UnifiedSearchViewSet.as_view({"get": "list"})
+        raw_request = factory.get(
+            "/api/documents/?query=tuition&retrieval_mode=hybrid",
+        )
+        mock_user = MagicMock()
+        mock_user.is_superuser = True
+        raw_request.user = mock_user
+
+        mock_backend = MagicMock()
+        # Keyword search found doc 1 (keyword only) and doc 2 (both keyword and semantic)
+        mock_backend.search_ids.return_value = [1, 2]
+        mock_backend.highlight_hits.return_value = [
+            SearchHit(
+                id=1,
+                score=10.5,
+                rank=1,
+                highlights={"content": "<b>tuition</b> fee"},
+            ),
+            SearchHit(
+                id=2,
+                score=8.2,
+                rank=2,
+                highlights={"content": "<b>tuition</b> grant"},
+            ),
+        ]
+
+        mock_qs = MagicMock()
+        mock_qs.filter.return_value.values_list.return_value = [1, 2, 3]
+
+        # Semantic search found doc 2 (both) and doc 3 (semantic only)
+        semantic_hits = [
+            SemanticDocumentHit(
+                document_id=2,
+                score=0.92,
+                rank=1,
+                best_chunk_text="University education grant",
+            ),
+            SemanticDocumentHit(
+                document_id=3,
+                score=0.85,
+                rank=2,
+                best_chunk_text="Scholarship application letter",
+            ),
+        ]
+
+        with (
+            patch.object(UnifiedSearchViewSet, "get_queryset", return_value=mock_qs),
+            patch.object(UnifiedSearchViewSet, "filter_queryset", return_value=mock_qs),
+            patch("documents.search.get_backend", return_value=mock_backend),
+            patch(
+                "paperless_ai.search.semantic_search_documents",
+                return_value=semantic_hits,
+            ),
+            patch.object(UnifiedSearchViewSet, "get_serializer") as mock_ser,
+        ):
+            mock_ser.return_value.data = [{"id": 2}, {"id": 1}, {"id": 3}]
+            response = view_func(raw_request)
+            assert response.status_code == 200
+
+        mock_ser.assert_called_once()
+        page_arg = mock_ser.call_args[0][0]
+        # Doc 2 (in both) -> gets semantic score (0.92) + keyword highlights
+        hit2 = next(h for h in page_arg if h["id"] == 2)
+        assert hit2["score"] == 0.92
+        assert hit2["highlights"] == {"content": "<b>tuition</b> grant"}
+
+        # Doc 1 (keyword only) -> score is None, keeps keyword highlights
+        hit1 = next(h for h in page_arg if h["id"] == 1)
+        assert hit1["score"] is None
+        assert hit1["highlights"] == {"content": "<b>tuition</b> fee"}
+
+        # Doc 3 (semantic only) -> score is 0.85, gets semantic chunk text highlight
+        hit3 = next(h for h in page_arg if h["id"] == 3)
+        assert hit3["score"] == 0.85
+        assert hit3["highlights"] == {"content": "Scholarship application letter"}
 
 
 class TestTantivyRelevanceListFallback:
