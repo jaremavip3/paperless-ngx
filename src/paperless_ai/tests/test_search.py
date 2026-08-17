@@ -43,7 +43,7 @@ class TestSemanticSearchDocuments:
         with (
             patch("paperless.config.AIConfig", return_value=mock_config),
             patch(
-                "paperless_ai.embedding.get_embedding_model",
+                "paperless_ai.search.get_embedding_model",
                 return_value=mock_model,
             ),
         ):
