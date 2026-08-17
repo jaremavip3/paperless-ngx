@@ -105,3 +105,21 @@ a {
 :host-context([data-bs-theme="dark"]) .similarity-score-value {
   color: #2dd4bf;
 }
+
+.keyword-match {
+  color: #6c757d;
+  font-weight: 500;
+
+  i-bs {
+    color: #6c757d;
+  }
+}
+
+:host-context([data-bs-theme="dark"]) .keyword-match {
+  color: #9ca3af;
+
+  i-bs {
+    color: #9ca3af;
+  }
+}
+

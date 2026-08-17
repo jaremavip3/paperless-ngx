@@ -1362,6 +1362,7 @@ class SearchResultSerializer(DocumentSerializer):
             "highlights": highlights.get("content", ""),
             "note_highlights": highlights.get("notes") or None,
             "rank": hit["rank"],
+            "search_type": hit.get("search_type"),
         }
 
         return r

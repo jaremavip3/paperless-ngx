@@ -504,17 +504,68 @@ class TestSemanticSearchHighlightFallback:
         # Doc 2 (in both) -> gets semantic score (0.92) + keyword highlights
         hit2 = next(h for h in page_arg if h["id"] == 2)
         assert hit2["score"] == 0.92
+        assert hit2["search_type"] == "semantic"
         assert hit2["highlights"] == {"content": "<b>tuition</b> grant"}
 
         # Doc 1 (keyword only) -> score is None, keeps keyword highlights
         hit1 = next(h for h in page_arg if h["id"] == 1)
         assert hit1["score"] is None
+        assert hit1["search_type"] == "keyword"
         assert hit1["highlights"] == {"content": "<b>tuition</b> fee"}
 
         # Doc 3 (semantic only) -> score is 0.85, gets semantic chunk text highlight
         hit3 = next(h for h in page_arg if h["id"] == 3)
         assert hit3["score"] == 0.85
+        assert hit3["search_type"] == "semantic"
         assert hit3["highlights"] == {"content": "Scholarship application letter"}
+
+    def test_default_search_sets_search_type_keyword_and_score_none(self):
+        from unittest.mock import MagicMock
+        from unittest.mock import patch
+
+        from rest_framework.test import APIRequestFactory
+
+        from documents.search._backend import SearchHit
+        from documents.views import UnifiedSearchViewSet
+
+        factory = APIRequestFactory()
+        view_func = UnifiedSearchViewSet.as_view({"get": "list"})
+        raw_request = factory.get("/api/documents/?query=invoice")
+        mock_user = MagicMock()
+        mock_user.is_superuser = True
+        raw_request.user = mock_user
+
+        mock_backend = MagicMock()
+        mock_backend.search_ids.return_value = [101]
+        mock_backend.highlight_hits.return_value = [
+            SearchHit(
+                id=101,
+                score=5.5,
+                rank=1,
+                highlights={"content": "<b>invoice</b>"},
+            ),
+        ]
+
+        mock_qs = MagicMock()
+        mock_qs.filter.return_value.values_list.return_value = [101]
+
+        with (
+            patch.object(UnifiedSearchViewSet, "get_queryset", return_value=mock_qs),
+            patch.object(UnifiedSearchViewSet, "filter_queryset", return_value=mock_qs),
+            patch("documents.search.get_backend", return_value=mock_backend),
+            patch.object(UnifiedSearchViewSet, "get_serializer") as mock_ser,
+        ):
+            mock_ser.return_value.data = [{"id": 101}]
+            response = view_func(raw_request)
+            assert response.status_code == 200
+
+        mock_ser.assert_called_once()
+        page_arg = mock_ser.call_args[0][0]
+        assert len(page_arg) == 1
+        assert page_arg[0]["id"] == 101
+        assert page_arg[0]["score"] is None
+        assert page_arg[0]["search_type"] == "keyword"
+        assert page_arg[0]["highlights"] == {"content": "<b>invoice</b>"}
 
 
 class TestTantivyRelevanceListFallback:

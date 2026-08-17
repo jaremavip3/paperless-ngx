@@ -2528,14 +2528,14 @@ class UnifiedSearchViewSet(DocumentViewSet):
             )
             hit_map = {h["id"]: h for h in raw_hits}
             page_hits = [
-                hit_map.get(
-                    doc_id,
-                    SearchHit(
-                        id=doc_id,
-                        score=0.0,
-                        rank=page_offset + idx + 1,
-                        highlights={},
-                    ),
+                SearchHit(
+                    id=doc_id,
+                    score=None,
+                    rank=page_offset + idx + 1,
+                    highlights=hit_map[doc_id]["highlights"]
+                    if doc_id in hit_map
+                    else {},
+                    search_type="keyword",
                 )
                 for idx, doc_id in enumerate(page_ids)
             ]
@@ -2563,7 +2563,13 @@ class UnifiedSearchViewSet(DocumentViewSet):
             page_offset = (page_num - 1) * page_size
             page_ids = ordered_ids[page_offset : page_offset + page_size]
             page_hits = [
-                SearchHit(id=doc_id, score=0.0, rank=rank, highlights={})
+                SearchHit(
+                    id=doc_id,
+                    score=None,
+                    rank=rank,
+                    highlights={},
+                    search_type="more_like_this",
+                )
                 for rank, doc_id in enumerate(page_ids, start=page_offset + 1)
             ]
             return SearchResultPage(
@@ -2661,13 +2667,20 @@ class UnifiedSearchViewSet(DocumentViewSet):
                 elif sem_hit and sem_hit.best_chunk_text:
                     highlights["content"] = sem_hit.best_chunk_text
 
-                score: float | None = sem_hit.score if sem_hit is not None else None
+                if sem_hit is not None:
+                    score = sem_hit.score
+                    search_type = "semantic"
+                else:
+                    score = None
+                    search_type = "keyword"
+
                 page_hits.append(
                     SearchHit(
                         id=doc_id,
                         score=score,
                         rank=page_offset + idx + 1,
                         highlights=highlights,
+                        search_type=search_type,
                     ),
                 )
             return SearchResultPage(

@@ -2038,9 +2038,11 @@ class TestDocumentSearchApi(DirectoriesMixin, APITestCase):
         backend = get_backend()
         backend.add_or_update(doc)
 
+        from documents.search._retrieval import HybridSearchResult
+
         with mock.patch(
             "documents.search._retrieval.hybrid_search",
-            return_value=[103],
+            return_value=HybridSearchResult(ordered_ids=[103]),
         ) as mock_hs:
             response = self.client.get(
                 "/api/documents/?query=invoice&retrieval_mode=hybrid",
@@ -2063,9 +2065,11 @@ class TestDocumentSearchApi(DirectoriesMixin, APITestCase):
         backend = get_backend()
         backend.add_or_update(doc)
 
+        from documents.search._retrieval import HybridSearchResult
+
         with mock.patch(
             "documents.search._retrieval.hybrid_search",
-            return_value=[104],
+            return_value=HybridSearchResult(ordered_ids=[104]),
         ) as mock_hs:
             response = self.client.get(
                 "/api/documents/?text=receipt&retrieval_mode=hybrid",
@@ -2088,9 +2092,11 @@ class TestDocumentSearchApi(DirectoriesMixin, APITestCase):
         backend = get_backend()
         backend.add_or_update(doc)
 
+        from documents.search._retrieval import HybridSearchResult
+
         with mock.patch(
             "documents.search._retrieval.hybrid_search",
-            return_value=[105],
+            return_value=HybridSearchResult(ordered_ids=[105]),
         ) as mock_hs:
             response = self.client.get(
                 "/api/documents/?title_search=Tax&retrieval_mode=hybrid",
@@ -2161,9 +2167,11 @@ class TestDocumentSearchApi(DirectoriesMixin, APITestCase):
         backend.add_or_update(doc1)
         backend.add_or_update(doc2)
 
+        from documents.search._retrieval import HybridSearchResult
+
         with mock.patch(
             "documents.search._retrieval.hybrid_search",
-            return_value=[107, 108],
+            return_value=HybridSearchResult(ordered_ids=[107, 108]),
         ):
             # Tantivy highlight_hits only returns highlights for doc107 (keyword match)
             response = self.client.get(

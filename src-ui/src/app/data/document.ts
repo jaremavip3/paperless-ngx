@@ -107,6 +107,7 @@ export const DOCUMENT_SORT_FIELDS_FULLTEXT = [
 export interface SearchHit {
   score?: number
   rank?: number
+  search_type?: 'semantic' | 'keyword' | 'more_like_this' | string
 
   highlights?: string
   note_highlights?: string

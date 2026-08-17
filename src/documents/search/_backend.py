@@ -98,13 +98,14 @@ def _extract_autocomplete_words(text_sources: list[str]) -> set[str]:
     return words
 
 
-class SearchHit(TypedDict):
+class SearchHit(TypedDict, total=False):
     """Type definition for search result hits."""
 
     id: int
     score: float | None
     rank: int
     highlights: dict[str, str]
+    search_type: str | None
 
 
 class TantivyRelevanceList:

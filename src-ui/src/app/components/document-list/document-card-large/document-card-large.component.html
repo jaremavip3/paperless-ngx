@@ -148,11 +148,16 @@
                   <i-bs width=".9em" height=".9em" class="me-2 text-muted" name="people-fill"></i-bs><small i18n>Shared</small>
                 </div>
               }
-              @if (document().__search_hit__?.score) {
+              @if (document().__search_hit__?.search_type === 'semantic' && document().__search_hit__?.score !== null && document().__search_hit__?.score !== undefined) {
                 <div class="list-group-item bg-light text-dark border-0 d-flex p-0 ps-4 search-score align-items-center">
                   <small class="me-2 text-muted" i18n>Score:</small>
                   <ngb-progressbar [type]="searchScoreClass" [value]="document().__search_hit__.score" class="search-score-bar mx-2 mt-1" [max]="1"></ngb-progressbar>
                   <small class="similarity-score-value ms-1">{{document().__search_hit__.score | number:'1.2-2'}}</small>
+                </div>
+              } @else if (document().__search_hit__?.search_type === 'keyword') {
+                <div class="list-group-item bg-light border-0 d-flex p-0 ps-4 keyword-match align-items-center">
+                  <i-bs width=".9em" height=".9em" class="me-2" name="search"></i-bs>
+                  <small i18n>Keyword match</small>
                 </div>
               }
               @for (field of document().custom_fields; track field.field) {

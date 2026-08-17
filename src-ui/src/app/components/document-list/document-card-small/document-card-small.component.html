@@ -111,11 +111,18 @@
               </div>
             </div>
           }
-          @if (document().__search_hit__?.score) {
+          @if (document().__search_hit__?.search_type === 'semantic' && document().__search_hit__?.score !== null && document().__search_hit__?.score !== undefined) {
             <div class="list-group-item bg-transparent p-0 border-0 d-flex flex-wrap-reverse justify-content-between">
-              <div class="ps-0 p-1 similarity-score" placement="top" ngbTooltip="Similarity score" i18n-ngbTooltip>
+              <div class="ps-0 p-1 similarity-score" placement="top" ngbTooltip="Semantic search (similarity: {{document().__search_hit__.score | number:'1.2-2'}})" i18n-ngbTooltip>
                 <i-bs width="1em" height="1em" class="me-2" name="bullseye"></i-bs>
                 <small>{{document().__search_hit__.score | number:'1.2-2'}}</small>
+              </div>
+            </div>
+          } @else if (document().__search_hit__?.search_type === 'keyword') {
+            <div class="list-group-item bg-transparent p-0 border-0 d-flex flex-wrap-reverse justify-content-between">
+              <div class="ps-0 p-1 keyword-match" placement="top" ngbTooltip="Keyword search match" i18n-ngbTooltip>
+                <i-bs width="1em" height="1em" class="me-2" name="search"></i-bs>
+                <small i18n>Keyword</small>
               </div>
             </div>
           }
