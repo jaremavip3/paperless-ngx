@@ -1,16 +1,5 @@
 name: Docker Build
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-beta.rc[0-9]+'
-    branches:
-      - dev
-      - beta
-  pull_request:
-    branches:
-      - dev
-      - main
   workflow_dispatch:
 concurrency:
   group: docker-${{ github.event.pull_request.number || github.ref }}
