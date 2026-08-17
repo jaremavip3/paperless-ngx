@@ -2400,6 +2400,12 @@ class UnifiedSearchViewSet(DocumentViewSet):
             return super(BulkPermissionMixin, self).get_serializer_context()
         return super().get_serializer_context()
 
+    def _is_search_request(self):
+        return (
+            bool(self._get_active_search_params())
+            or "retrieval_mode" in self.request.query_params
+        )
+
     def _get_active_search_params(self, request: Request | None = None) -> list[str]:
         request = request or self.request
         return [
@@ -2407,9 +2413,6 @@ class UnifiedSearchViewSet(DocumentViewSet):
             for param in _TANTIVY_SEARCH_PARAM_NAMES
             if param in request.query_params
         ]
-
-    def _is_search_request(self):
-        return bool(self._get_active_search_params())
 
     def list(self, request, *args, **kwargs):
         if not self._is_search_request():
@@ -2558,6 +2561,64 @@ class UnifiedSearchViewSet(DocumentViewSet):
                 page_offset=page_offset,
             )
 
+        def run_hybrid_search(
+            backend: TantivyBackend,
+            user: User | None,
+            filtered_qs: QuerySet[Document],
+            mode: str,
+        ) -> SearchResultPage:
+            """Handle hybrid/semantic search with RRF fusion."""
+            query_str, search_mode = _get_tantivy_query_and_mode(request.query_params)
+            if not query_str:
+                # Fallback to keyword if no query text
+                return run_text_search(backend, user, filtered_qs)
+
+            from documents.search._retrieval import (
+                RetrievalMode,
+                hybrid_search,
+                SEMANTIC_CANDIDATE_K,
+                SEMANTIC_CHUNK_K,
+            )
+            from paperless_ai.search import semantic_search_documents
+
+            if mode == RetrievalMode.SEMANTIC:
+                # Pure semantic search
+                allowed_ids = list(filtered_qs.values_list("id", flat=True))
+                semantic_hits = semantic_search_documents(
+                    query_str,
+                    document_ids=allowed_ids if len(allowed_ids) <= 32_700 else None,
+                    limit=50,
+                    chunk_k=SEMANTIC_CHUNK_K,
+                )
+                ordered_ids = [h.document_id for h in semantic_hits]
+                if len(allowed_ids) > 32_700:
+                    allowed_set = set(allowed_ids)
+                    ordered_ids = [d for d in ordered_ids if d in allowed_set]
+                ordered_ids = intersect_and_order(ordered_ids, filtered_qs, use_tantivy_sort=True)
+            else:
+                # Hybrid: keyword + semantic with RRF
+                ordered_ids = hybrid_search(
+                    query_str,
+                    backend=backend,
+                    user=user,
+                    filtered_qs=filtered_qs,
+                )
+
+            page_offset = (page_num - 1) * page_size
+            page_ids = ordered_ids[page_offset : page_offset + page_size]
+            # For keyword query parts, generate highlights; for semantic-only, empty highlights
+            page_hits = backend.highlight_hits(
+                query_str,
+                page_ids,
+                search_mode=search_mode,
+                rank_start=page_offset + 1,
+            )
+            return SearchResultPage(
+                ordered_ids=ordered_ids,
+                hits=page_hits,
+                page_offset=page_offset,
+            )
+
         try:
             sort_field_name, sort_reverse, use_tantivy_sort, page_num, page_size = (
                 parse_search_params()
@@ -2569,6 +2630,12 @@ class UnifiedSearchViewSet(DocumentViewSet):
 
             if "more_like_id" in request.query_params:
                 result = run_more_like_this(backend, user, filtered_qs)
+            elif "retrieval_mode" in request.query_params:
+                mode = request.query_params.get("retrieval_mode", "keyword")
+                if mode in ("hybrid", "semantic"):
+                    result = run_hybrid_search(backend, user, filtered_qs, mode)
+                else:
+                    result = run_text_search(backend, user, filtered_qs)
             else:
                 result = run_text_search(backend, user, filtered_qs)
 
