@@ -2682,12 +2682,22 @@ class UnifiedSearchViewSet(DocumentViewSet):
                 elif sem_hit and sem_hit.best_chunk_text:
                     highlights["content"] = sem_hit.best_chunk_text
 
+                score: float | None = None
                 if sem_hit is not None:
                     score = sem_hit.score
+                elif doc_id in missing_semantic_map:
+                    score = missing_semantic_map[doc_id].score
+
+                # In Hybrid mode, anything found by the default (keyword) engine is marked as "keyword"
+                # (grey score); only documents found exclusively via semantic search are "semantic" (teal score).
+                if mode == RetrievalMode.HYBRID:
+                    if kw_hit is not None:
+                        search_type = "keyword"
+                    else:
+                        search_type = "semantic"
+                elif mode == RetrievalMode.SEMANTIC:
                     search_type = "semantic"
                 else:
-                    missing_hit = missing_semantic_map.get(doc_id)
-                    score = missing_hit.score if missing_hit is not None else None
                     search_type = "keyword"
 
                 page_hits.append(

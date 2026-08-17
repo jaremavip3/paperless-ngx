@@ -513,10 +513,10 @@ class TestSemanticSearchHighlightFallback:
 
         mock_ser.assert_called_once()
         page_arg = mock_ser.call_args[0][0]
-        # Doc 2 (in both) -> gets semantic score (0.92) + keyword highlights
+        # Doc 2 (in both keyword and semantic) -> search_type is "keyword" (grey), score is 0.92
         hit2 = next(h for h in page_arg if h["id"] == 2)
         assert hit2["score"] == 0.92
-        assert hit2["search_type"] == "semantic"
+        assert hit2["search_type"] == "keyword"
         assert hit2["highlights"] == {"content": "<b>tuition</b> grant"}
 
         # Doc 1 (keyword only) -> score is 0.65 (computed), search_type is keyword
