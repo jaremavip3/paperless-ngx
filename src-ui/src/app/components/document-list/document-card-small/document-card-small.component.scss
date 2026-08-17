@@ -107,3 +107,12 @@ a {
     }
   }
 }
+
+.similarity-score {
+  color: var(--bs-teal, #20c997);
+  font-weight: 500;
+
+  i-bs {
+    color: var(--bs-teal, #20c997);
+  }
+}

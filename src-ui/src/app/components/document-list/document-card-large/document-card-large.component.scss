@@ -95,3 +95,9 @@
 a {
   cursor: pointer;
 }
+
+.similarity-score-value {
+  color: var(--bs-teal, #20c997);
+  font-weight: 500;
+  font-size: 0.8em;
+}
