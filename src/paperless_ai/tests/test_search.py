@@ -3,6 +3,8 @@
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
+import pytest
+
 from paperless_ai.search import SemanticDocumentHit
 from paperless_ai.search import semantic_search_documents
 
@@ -26,23 +28,27 @@ class TestSemanticDocumentHit:
 
 
 class TestSemanticSearchDocuments:
-    @patch("paperless.config.AIConfig")
-    def test_returns_empty_when_index_disabled(self, mock_config_cls):
+    def test_returns_empty_when_index_disabled(self):
         mock_config = MagicMock()
         mock_config.llm_index_enabled = False
-        mock_config_cls.return_value = mock_config
-        assert semantic_search_documents("test query") == []
+        with patch("paperless.config.AIConfig", return_value=mock_config):
+            assert semantic_search_documents("test query") == []
 
-    @patch("paperless.config.AIConfig")
-    @patch("paperless_ai.embedding.get_embedding_model")
-    def test_returns_empty_on_embedding_failure(self, mock_get_model, mock_config_cls):
+    def test_returns_empty_on_embedding_failure(self):
         mock_config = MagicMock()
         mock_config.llm_index_enabled = True
-        mock_config_cls.return_value = mock_config
+        mock_config.llm_embedding_backend = "openai_like"
         mock_model = MagicMock()
         mock_model.get_text_embedding.side_effect = Exception("embed failed")
-        mock_get_model.return_value = mock_model
-        assert semantic_search_documents("test query") == []
+        with (
+            patch("paperless.config.AIConfig", return_value=mock_config),
+            patch(
+                "paperless_ai.embedding.get_embedding_model",
+                return_value=mock_model,
+            ),
+        ):
+            assert semantic_search_documents("test query") == []
 
+    @pytest.mark.django_db
     def test_returns_empty_for_empty_document_ids(self):
         assert semantic_search_documents("test", document_ids=[]) == []

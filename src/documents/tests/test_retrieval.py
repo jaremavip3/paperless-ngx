@@ -1,6 +1,5 @@
 """Tests for hybrid search retrieval and RRF."""
 
-
 from documents.search._retrieval import RetrievalMode
 from documents.search._retrieval import reciprocal_rank_fusion
 

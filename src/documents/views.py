@@ -2592,7 +2592,9 @@ class UnifiedSearchViewSet(DocumentViewSet):
                     allowed_set = set(allowed_ids)
                     ordered_ids = [d for d in ordered_ids if d in allowed_set]
                 ordered_ids = intersect_and_order(
-                    ordered_ids, filtered_qs, use_tantivy_sort=True
+                    ordered_ids,
+                    filtered_qs,
+                    use_tantivy_sort=True,
                 )
             else:
                 # Hybrid: keyword + semantic with RRF
