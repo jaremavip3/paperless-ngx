@@ -2496,7 +2496,11 @@ class UnifiedSearchViewSet(DocumentViewSet):
             filtered_qs: QuerySet[Document],
         ) -> SearchResultPage:
             """Handle text/title/query search: IDs, ORM intersection, page highlights."""
-            query_str, search_mode = _get_tantivy_query_and_mode(request.query_params)
+            result = _get_tantivy_query_and_mode(request.query_params)
+            if result is None:
+                # No search query — return empty results
+                return SearchResultPage(ordered_ids=[], hits=[], page_offset=0)
+            query_str, search_mode = result
 
             # "score" is not a real Tantivy sort field — it means relevance order,
             # which is Tantivy's default when no sort field is specified.
