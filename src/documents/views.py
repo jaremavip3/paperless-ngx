@@ -2400,19 +2400,13 @@ class UnifiedSearchViewSet(DocumentViewSet):
             return super(BulkPermissionMixin, self).get_serializer_context()
         return super().get_serializer_context()
 
-    def _is_search_request(self):
-        return (
-            bool(self._get_active_search_params())
-            or "retrieval_mode" in self.request.query_params
-        )
+    def _is_search_request(self, request: Request | None = None) -> bool:
+        return bool(self._get_active_search_params(request))
 
     def _get_active_search_params(self, request: Request | None = None) -> list[str]:
         request = request or self.request
-        return [
-            param
-            for param in _TANTIVY_SEARCH_PARAM_NAMES
-            if param in request.query_params
-        ]
+        query_params = getattr(request, "query_params", getattr(request, "GET", {}))
+        return [param for param in _TANTIVY_SEARCH_PARAM_NAMES if param in query_params]
 
     def list(self, request, *args, **kwargs):
         if not self._is_search_request():
@@ -2526,12 +2520,25 @@ class UnifiedSearchViewSet(DocumentViewSet):
 
             page_offset = (page_num - 1) * page_size
             page_ids = ordered_ids[page_offset : page_offset + page_size]
-            page_hits = backend.highlight_hits(
+            raw_hits = backend.highlight_hits(
                 query_str,
                 page_ids,
                 search_mode=search_mode,
                 rank_start=page_offset + 1,
             )
+            hit_map = {h["id"]: h for h in raw_hits}
+            page_hits = [
+                hit_map.get(
+                    doc_id,
+                    SearchHit(
+                        id=doc_id,
+                        score=0.0,
+                        rank=page_offset + idx + 1,
+                        highlights={},
+                    ),
+                )
+                for idx, doc_id in enumerate(page_ids)
+            ]
             return SearchResultPage(
                 ordered_ids=ordered_ids,
                 hits=page_hits,
@@ -2580,24 +2587,22 @@ class UnifiedSearchViewSet(DocumentViewSet):
                 # Fallback to keyword if no query text
                 return run_text_search(backend, user, filtered_qs)
 
+            from documents.search._retrieval import SEMANTIC_CANDIDATE_K
             from documents.search._retrieval import SEMANTIC_CHUNK_K
             from documents.search._retrieval import RetrievalMode
             from documents.search._retrieval import hybrid_search
             from paperless_ai.search import semantic_search_documents
 
+            semantic_map = {}
             if mode == RetrievalMode.SEMANTIC:
                 # Pure semantic search
-                allowed_ids = list(filtered_qs.values_list("id", flat=True))
                 semantic_hits = semantic_search_documents(
                     query_str,
-                    document_ids=allowed_ids if len(allowed_ids) <= 32_700 else None,
-                    limit=50,
+                    limit=SEMANTIC_CANDIDATE_K,
                     chunk_k=SEMANTIC_CHUNK_K,
                 )
+                semantic_map = {h.document_id: h for h in semantic_hits}
                 ordered_ids = [h.document_id for h in semantic_hits]
-                if len(allowed_ids) > 32_700:
-                    allowed_set = set(allowed_ids)
-                    ordered_ids = [d for d in ordered_ids if d in allowed_set]
                 ordered_ids = intersect_and_order(
                     ordered_ids,
                     filtered_qs,
@@ -2610,17 +2615,39 @@ class UnifiedSearchViewSet(DocumentViewSet):
                     backend=backend,
                     user=user,
                     filtered_qs=filtered_qs,
+                    search_mode=search_mode,
                 )
 
             page_offset = (page_num - 1) * page_size
             page_ids = ordered_ids[page_offset : page_offset + page_size]
-            # For keyword query parts, generate highlights; for semantic-only, empty highlights
-            page_hits = backend.highlight_hits(
+            # For keyword query parts, generate highlights; for semantic-only, fallback SearchHit
+            raw_hits = backend.highlight_hits(
                 query_str,
                 page_ids,
                 search_mode=search_mode,
                 rank_start=page_offset + 1,
             )
+            hit_map = {h["id"]: h for h in raw_hits}
+            page_hits: list[SearchHit] = []
+            for idx, doc_id in enumerate(page_ids):
+                if doc_id in hit_map:
+                    page_hits.append(hit_map[doc_id])
+                else:
+                    sem_hit = semantic_map.get(doc_id)
+                    highlights: dict[str, str] = {}
+                    score = 0.0
+                    if sem_hit is not None:
+                        score = sem_hit.score
+                        if sem_hit.best_chunk_text:
+                            highlights["content"] = sem_hit.best_chunk_text
+                    page_hits.append(
+                        SearchHit(
+                            id=doc_id,
+                            score=score,
+                            rank=page_offset + idx + 1,
+                            highlights=highlights,
+                        ),
+                    )
             return SearchResultPage(
                 ordered_ids=ordered_ids,
                 hits=page_hits,

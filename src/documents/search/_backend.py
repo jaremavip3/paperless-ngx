@@ -139,25 +139,43 @@ class TantivyRelevanceList:
     def __getitem__(self, key: int | slice) -> SearchHit | list[SearchHit]:
         if isinstance(key, int):
             idx = key if key >= 0 else len(self._ordered_ids) + key
-            if self._page_offset <= idx < self._page_offset + len(self._page_hits):
-                return self._page_hits[idx - self._page_offset]
+            doc_id = self._ordered_ids[key]
+            for hit in self._page_hits:
+                if hit["id"] == doc_id:
+                    return hit
             return SearchHit(
-                id=self._ordered_ids[key],
+                id=doc_id,
                 score=0.0,
                 rank=idx + 1,
                 highlights={},
             )
         start = key.start or 0
         stop = key.stop or len(self._ordered_ids)
-        # DRF slices to extract the current page.  If the slice aligns
-        # with our pre-fetched page_hits, return them directly.
+        # DRF slices to extract the current page. If the slice aligns
+        # with our pre-fetched page_hits, return matching hits with fallback.
         # We only check start — DRF always slices with stop=start+page_size,
         # which exceeds page_hits length on the last page.
         if start == self._page_offset:
-            return self._page_hits[: stop - start]
+            slice_ids = self._ordered_ids[start:stop]
+            hit_map = {h["id"]: h for h in self._page_hits}
+            return [
+                hit_map.get(
+                    doc_id,
+                    SearchHit(
+                        id=doc_id,
+                        score=0.0,
+                        rank=start + i + 1,
+                        highlights={},
+                    ),
+                )
+                for i, doc_id in enumerate(slice_ids)
+            ]
         # Fallback: return stub dicts (no highlights).
+        start_idx = key.start if key.start is not None else 0
+        if start_idx < 0:
+            start_idx = max(0, len(self._ordered_ids) + start_idx)
         return [
-            SearchHit(id=doc_id, score=0.0, rank=start + i + 1, highlights={})
+            SearchHit(id=doc_id, score=0.0, rank=start_idx + i + 1, highlights={})
             for i, doc_id in enumerate(self._ordered_ids[key])
         ]
 

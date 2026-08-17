@@ -11,6 +11,8 @@ import logging
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
+from documents.search._backend import SearchMode
+
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from django.db.models import QuerySet
@@ -89,6 +91,7 @@ def hybrid_search(
     backend: TantivyBackend,
     user: AbstractUser | None,
     filtered_qs: QuerySet[Document],
+    search_mode: SearchMode = SearchMode.QUERY,
     keyword_limit: int = KEYWORD_CANDIDATE_K,
     semantic_limit: int = SEMANTIC_CANDIDATE_K,
     semantic_chunk_k: int = SEMANTIC_CHUNK_K,
@@ -106,6 +109,8 @@ def hybrid_search(
     filtered_qs:
         Django queryset already filtered by permissions and other
         document-list filters (tags, correspondents, dates, etc.).
+    search_mode:
+        Search mode for Tantivy query parsing (query, text, or title).
     keyword_limit:
         Max documents to request from Tantivy.
     semantic_limit:
@@ -120,35 +125,24 @@ def hybrid_search(
         ``filtered_qs`` visibility.
     """
     # --- Keyword search (Tantivy) ---
-    from documents.search import SearchMode
-
     keyword_ids = backend.search_ids(
         query,
         user=user,
-        search_mode=SearchMode.QUERY,
+        search_mode=search_mode,
         limit=keyword_limit,
     )
     logger.debug("Keyword search returned %d documents", len(keyword_ids))
 
     # --- Semantic search (embedding index) ---
-    # Build the set of allowed document IDs from the ORM queryset.
-    allowed_ids = list(filtered_qs.values_list("id", flat=True))
-
     from paperless_ai.search import semantic_search_documents
 
     semantic_hits = semantic_search_documents(
         query,
-        document_ids=allowed_ids if len(allowed_ids) <= 32_700 else None,
         limit=semantic_limit,
         chunk_k=semantic_chunk_k,
     )
     semantic_ids = [h.document_id for h in semantic_hits]
     logger.debug("Semantic search returned %d documents", len(semantic_ids))
-
-    # If the allowed set was too large for an IN filter, intersect now.
-    if len(allowed_ids) > 32_700:
-        allowed_set = set(allowed_ids)
-        semantic_ids = [d for d in semantic_ids if d in allowed_set]
 
     # --- Fuse ---
     fused_ids = reciprocal_rank_fusion(keyword_ids, semantic_ids)

@@ -36,8 +36,6 @@ jobs:
         run: |
           if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
             echo "run_all=true" >> "$GITHUB_OUTPUT"
-          elif [[ "${EVENT_NAME}" == "push" && ( "${REF_NAME}" == "main" || "${REF_NAME}" == "dev" ) ]]; then
-            echo "run_all=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_all=false" >> "$GITHUB_OUTPUT"
           fi

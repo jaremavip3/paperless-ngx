@@ -2005,3 +2005,182 @@ class TestDocumentSearchApi(DirectoriesMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         response = self.client.get("/api/search/?query=no")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_retrieval_mode_without_query_returns_standard_documents(self) -> None:
+        Document.objects.create(
+            title="Doc 1",
+            content="Content 1",
+            checksum="C1",
+            pk=101,
+        )
+        Document.objects.create(
+            title="Doc 2",
+            content="Content 2",
+            checksum="C2",
+            pk=102,
+        )
+        for mode in ("hybrid", "semantic", "keyword"):
+            response = self.client.get(f"/api/documents/?retrieval_mode={mode}")
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 2)
+            results = response.data["results"]
+            self.assertEqual(len(results), 2)
+            self.assertIn("title", results[0])
+            self.assertNotIn("__search_hit__", results[0])
+
+    def test_list_retrieval_mode_with_query_performs_hybrid_search(self) -> None:
+        doc = Document.objects.create(
+            title="Invoice Document",
+            content="Payment received",
+            checksum="C3",
+            pk=103,
+        )
+        backend = get_backend()
+        backend.add_or_update(doc)
+
+        with mock.patch(
+            "documents.search._retrieval.hybrid_search",
+            return_value=[103],
+        ) as mock_hs:
+            response = self.client.get(
+                "/api/documents/?query=invoice&retrieval_mode=hybrid",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 1)
+            mock_hs.assert_called_once()
+            _, kwargs = mock_hs.call_args
+            from documents.search._backend import SearchMode
+
+            self.assertEqual(kwargs["search_mode"], SearchMode.QUERY)
+
+    def test_list_retrieval_mode_with_text_performs_hybrid_search(self) -> None:
+        doc = Document.objects.create(
+            title="Receipt Document",
+            content="Items purchased",
+            checksum="C4",
+            pk=104,
+        )
+        backend = get_backend()
+        backend.add_or_update(doc)
+
+        with mock.patch(
+            "documents.search._retrieval.hybrid_search",
+            return_value=[104],
+        ) as mock_hs:
+            response = self.client.get(
+                "/api/documents/?text=receipt&retrieval_mode=hybrid",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 1)
+            mock_hs.assert_called_once()
+            _, kwargs = mock_hs.call_args
+            from documents.search._backend import SearchMode
+
+            self.assertEqual(kwargs["search_mode"], SearchMode.TEXT)
+
+    def test_list_retrieval_mode_with_title_search_performs_hybrid_search(self) -> None:
+        doc = Document.objects.create(
+            title="Tax Return",
+            content="Government forms",
+            checksum="C5",
+            pk=105,
+        )
+        backend = get_backend()
+        backend.add_or_update(doc)
+
+        with mock.patch(
+            "documents.search._retrieval.hybrid_search",
+            return_value=[105],
+        ) as mock_hs:
+            response = self.client.get(
+                "/api/documents/?title_search=Tax&retrieval_mode=hybrid",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 1)
+            mock_hs.assert_called_once()
+            _, kwargs = mock_hs.call_args
+            from documents.search._backend import SearchMode
+
+            self.assertEqual(kwargs["search_mode"], SearchMode.TITLE)
+
+    def test_list_retrieval_mode_semantic_performs_semantic_search(self) -> None:
+        doc = Document.objects.create(
+            title="Semantic Hit",
+            content="Vector matching content",
+            checksum="C6",
+            pk=106,
+        )
+        backend = get_backend()
+        backend.add_or_update(doc)
+
+        from paperless_ai.search import SemanticDocumentHit
+
+        with mock.patch(
+            "paperless_ai.search.semantic_search_documents",
+            return_value=[
+                SemanticDocumentHit(
+                    document_id=106,
+                    score=0.92,
+                    rank=1,
+                    best_chunk_text="Matched vector chunk snippet",
+                ),
+            ],
+        ) as mock_semantic:
+            response = self.client.get(
+                "/api/documents/?query=financial&retrieval_mode=semantic",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 1)
+            self.assertEqual(len(response.data["results"]), 1)
+            result_doc = response.data["results"][0]
+            self.assertEqual(result_doc["id"], 106)
+            self.assertEqual(result_doc["title"], "Semantic Hit")
+            self.assertEqual(result_doc["__search_hit__"]["score"], 0.92)
+            self.assertEqual(
+                result_doc["__search_hit__"]["highlights"],
+                "Matched vector chunk snippet",
+            )
+            mock_semantic.assert_called_once()
+
+    def test_list_retrieval_mode_hybrid_serializes_all_results_with_fallback(
+        self,
+    ) -> None:
+        doc1 = Document.objects.create(
+            title="Keyword Doc",
+            content="invoice billing statement",
+            checksum="C7",
+            pk=107,
+        )
+        doc2 = Document.objects.create(
+            title="Semantic Only Doc",
+            content="completely different words about taxes",
+            checksum="C8",
+            pk=108,
+        )
+        backend = get_backend()
+        backend.add_or_update(doc1)
+        backend.add_or_update(doc2)
+
+        with mock.patch(
+            "documents.search._retrieval.hybrid_search",
+            return_value=[107, 108],
+        ):
+            # Tantivy highlight_hits only returns highlights for doc107 (keyword match)
+            response = self.client.get(
+                "/api/documents/?query=invoice&retrieval_mode=hybrid",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["count"], 2)
+            self.assertEqual(len(response.data["results"]), 2)
+            ids = [r["id"] for r in response.data["results"]]
+            self.assertEqual(ids, [107, 108])
+            # doc107 has Tantivy keyword highlight
+            self.assertIn(
+                "<b>invoice</b>",
+                response.data["results"][0]["__search_hit__"]["highlights"],
+            )
+            # doc108 has fallback empty highlight (not dropped from page)
+            self.assertEqual(
+                response.data["results"][1]["__search_hit__"]["highlights"],
+                "",
+            )
