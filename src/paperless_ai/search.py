@@ -37,6 +37,7 @@ def semantic_search_documents(
     document_ids: list[int] | None = None,
     limit: int = 50,
     chunk_k: int = 200,
+    min_score: float | None = None,
 ) -> list[SemanticDocumentHit]:
     """Search documents by semantic similarity.
 
@@ -56,6 +57,9 @@ def semantic_search_documents(
     chunk_k:
         Number of chunks to retrieve from the vector store before
         deduplication.  Higher values improve recall for large corpora.
+    min_score:
+        Minimum similarity score threshold (0.0 to 1.0). Results below this
+        threshold are filtered out. When ``None``, no threshold filtering is applied.
 
     Returns
     -------
@@ -115,6 +119,12 @@ def semantic_search_documents(
 
         if doc_id not in doc_scores or score > doc_scores[doc_id][0]:
             doc_scores[doc_id] = (score, chunk_text)
+
+    # Filter by minimum similarity score if specified
+    if min_score is not None:
+        doc_scores = {
+            doc_id: val for doc_id, val in doc_scores.items() if val[0] >= min_score
+        }
 
     # Sort by score descending and assign ranks.
     sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1][0], reverse=True)[

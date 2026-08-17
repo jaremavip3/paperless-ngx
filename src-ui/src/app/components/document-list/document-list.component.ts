@@ -244,6 +244,10 @@ export class DocumentListComponent
     this.list.setRetrievalMode(mode)
   }
 
+  onSemanticThresholdChange(threshold: string | number | null) {
+    this.list.setSemanticThreshold(threshold)
+  }
+
   get isBulkEditing(): boolean {
     return this.list.hasSelection
   }

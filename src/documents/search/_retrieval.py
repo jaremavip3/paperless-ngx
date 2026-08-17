@@ -95,6 +95,7 @@ def hybrid_search(
     keyword_limit: int = KEYWORD_CANDIDATE_K,
     semantic_limit: int = SEMANTIC_CANDIDATE_K,
     semantic_chunk_k: int = SEMANTIC_CHUNK_K,
+    min_score: float | None = None,
 ) -> list[int]:
     """Run keyword + semantic search and fuse with RRF.
 
@@ -117,6 +118,8 @@ def hybrid_search(
         Max documents to request from semantic search.
     semantic_chunk_k:
         Chunks to retrieve from vector store.
+    min_score:
+        Minimum similarity score threshold for semantic search.
 
     Returns
     -------
@@ -140,6 +143,7 @@ def hybrid_search(
         query,
         limit=semantic_limit,
         chunk_k=semantic_chunk_k,
+        min_score=min_score,
     )
     semantic_ids = [h.document_id for h in semantic_hits]
     logger.debug("Semantic search returned %d documents", len(semantic_ids))

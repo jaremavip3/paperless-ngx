@@ -1127,13 +1127,22 @@ export class FilterEditorComponent
   @Output()
   retrievalModeChange = new EventEmitter<string>()
 
+  @Output()
+  semanticThresholdChange = new EventEmitter<string | number | null>()
+
   retrievalMode: string = 'default'
+  semanticThreshold: string | number | null = null
 
   @Input()
   set incomingRetrievalMode(mode: string) {
     if (mode) {
       this.retrievalMode = mode
     }
+  }
+
+  @Input()
+  set incomingSemanticThreshold(threshold: string | number | null) {
+    this.semanticThreshold = threshold
   }
 
   readonly retrievalModes = [
@@ -1160,6 +1169,15 @@ export class FilterEditorComponent
     this.retrievalMode = mode
     this.retrievalModeChange.emit(mode)
     this.updateRules()
+  }
+
+  onSemanticThresholdChange() {
+    this.semanticThresholdChange.emit(this.semanticThreshold)
+    this.updateRules()
+  }
+
+  onSemanticThresholdEnter() {
+    this.onSemanticThresholdChange()
   }
 
   @Input()

@@ -87,7 +87,12 @@ class TestHybridSearch:
             search_mode=SearchMode.QUERY,
             limit=200,
         )
-        mock_semantic.assert_called_once_with("test query", limit=200, chunk_k=200)
+        mock_semantic.assert_called_once_with(
+            "test query",
+            limit=200,
+            chunk_k=200,
+            min_score=None,
+        )
         assert result == [1, 2]
 
     def test_hybrid_search_passes_custom_search_mode(self):
@@ -123,6 +128,38 @@ class TestHybridSearch:
         )
         assert result == [10]
 
+    def test_hybrid_search_passes_min_score(self):
+        from unittest.mock import MagicMock
+        from unittest.mock import patch
+
+        from documents.search._retrieval import hybrid_search
+
+        backend = MagicMock()
+        backend.search_ids.return_value = [1]
+        user = MagicMock()
+        filtered_qs = MagicMock()
+        filtered_qs.filter.return_value.values_list.return_value = [1]
+
+        with patch(
+            "paperless_ai.search.semantic_search_documents",
+            return_value=[],
+        ) as mock_semantic:
+            result = hybrid_search(
+                "test query",
+                backend=backend,
+                user=user,
+                filtered_qs=filtered_qs,
+                min_score=0.85,
+            )
+
+        mock_semantic.assert_called_once_with(
+            "test query",
+            limit=200,
+            chunk_k=200,
+            min_score=0.85,
+        )
+        assert result == [1]
+
     def test_hybrid_search_no_eager_document_ids_fetching(self):
         from unittest.mock import MagicMock
         from unittest.mock import patch
@@ -149,7 +186,12 @@ class TestHybridSearch:
             )
 
         # semantic_search_documents called without document_ids parameter
-        mock_semantic.assert_called_once_with("query", limit=200, chunk_k=200)
+        mock_semantic.assert_called_once_with(
+            "query",
+            limit=200,
+            chunk_k=200,
+            min_score=None,
+        )
         assert result == [2, 1]
 
     def test_hybrid_search_post_intersection(self):
@@ -346,7 +388,7 @@ class TestSemanticSearchHighlightFallback:
             ),
             SemanticDocumentHit(
                 document_id=3,
-                score=0.75,
+                score=0.82,
                 rank=3,
                 best_chunk_text=None,
             ),
@@ -380,7 +422,7 @@ class TestSemanticSearchHighlightFallback:
         assert page_arg[1]["rank"] == 2
         assert page_arg[1]["highlights"] == {"content": "Salary slip statement"}
         assert page_arg[2]["id"] == 3
-        assert page_arg[2]["score"] == 0.75
+        assert page_arg[2]["score"] == 0.82
         assert page_arg[2]["rank"] == 3
         assert page_arg[2]["highlights"] == {}
 

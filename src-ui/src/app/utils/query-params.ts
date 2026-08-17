@@ -24,6 +24,7 @@ const SORT_FIELD_PARAMETER = 'sort'
 const SORT_REVERSE_PARAMETER = 'reverse'
 const PAGE_PARAMETER = 'page'
 const RETRIEVAL_MODE_PARAMETER = 'retrieval_mode'
+const SEMANTIC_THRESHOLD_PARAMETER = 'semantic_threshold'
 
 export function paramsFromViewState(
   viewState: ListViewState,
@@ -34,6 +35,13 @@ export function paramsFromViewState(
   params[SORT_REVERSE_PARAMETER] = viewState.sortReverse ? 1 : undefined
   if (viewState.retrievalMode && viewState.retrievalMode !== 'default') {
     params[RETRIEVAL_MODE_PARAMETER] = viewState.retrievalMode
+  }
+  if (
+    viewState.semanticThreshold !== undefined &&
+    viewState.semanticThreshold !== null &&
+    viewState.semanticThreshold !== ''
+  ) {
+    params[SEMANTIC_THRESHOLD_PARAMETER] = viewState.semanticThreshold
   }
   if (pageOnly) params = {}
   params[PAGE_PARAMETER] = isNaN(viewState.currentPage)
@@ -54,12 +62,14 @@ export function paramsToViewState(queryParams: ParamMap): ListViewState {
     ? parseInt(queryParams.get(PAGE_PARAMETER))
     : 1
   let retrievalMode = queryParams.get(RETRIEVAL_MODE_PARAMETER) ?? 'default'
+  let semanticThreshold = queryParams.get(SEMANTIC_THRESHOLD_PARAMETER) ?? null
   return {
     currentPage: currentPage,
     filterRules: filterRules,
     sortField: sortField,
     sortReverse: sortReverse,
     retrievalMode: retrievalMode,
+    semanticThreshold: semanticThreshold,
   }
 }
 

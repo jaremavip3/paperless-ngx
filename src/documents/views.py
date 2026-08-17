@@ -2587,11 +2587,29 @@ class UnifiedSearchViewSet(DocumentViewSet):
                 # Fallback to keyword if no query text
                 return run_text_search(backend, user, filtered_qs)
 
+            from django.conf import settings
+
             from documents.search._retrieval import SEMANTIC_CANDIDATE_K
             from documents.search._retrieval import SEMANTIC_CHUNK_K
             from documents.search._retrieval import RetrievalMode
             from documents.search._retrieval import hybrid_search
             from paperless_ai.search import semantic_search_documents
+
+            raw_threshold = request.query_params.get("semantic_threshold")
+            min_score: float | None = getattr(
+                settings,
+                "LLM_SEMANTIC_THRESHOLD",
+                0.80,
+            )
+            if raw_threshold is not None:
+                raw_threshold_str = raw_threshold.strip().lower()
+                if raw_threshold_str in ("none", "0", "0.0", "off", "all"):
+                    min_score = None
+                else:
+                    try:
+                        min_score = float(raw_threshold_str)
+                    except ValueError:
+                        pass
 
             semantic_map = {}
             if mode == RetrievalMode.SEMANTIC:
@@ -2600,6 +2618,7 @@ class UnifiedSearchViewSet(DocumentViewSet):
                     query_str,
                     limit=SEMANTIC_CANDIDATE_K,
                     chunk_k=SEMANTIC_CHUNK_K,
+                    min_score=min_score,
                 )
                 semantic_map = {h.document_id: h for h in semantic_hits}
                 ordered_ids = [h.document_id for h in semantic_hits]
@@ -2616,6 +2635,7 @@ class UnifiedSearchViewSet(DocumentViewSet):
                     user=user,
                     filtered_qs=filtered_qs,
                     search_mode=search_mode,
+                    min_score=min_score,
                 )
 
             page_offset = (page_num - 1) * page_size

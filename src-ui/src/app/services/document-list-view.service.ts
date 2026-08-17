@@ -38,6 +38,7 @@ const RESTORABLE_LIST_VIEW_STATE_KEYS: (keyof ListViewState)[] = [
   'displayMode',
   'displayFields',
   'retrievalMode',
+  'semanticThreshold',
 ]
 
 /**
@@ -100,6 +101,11 @@ export interface ListViewState {
    * Retrieval mode for search: 'default', 'hybrid', or 'semantic'.
    */
   retrievalMode?: string
+
+  /**
+   * Semantic similarity score threshold (0.0 - 1.0)
+   */
+  semanticThreshold?: string | number | null
 
   /**
    * The fields to display in the document list.
@@ -340,6 +346,11 @@ export class DocumentListViewService {
             activeListViewState.retrievalMode !== 'default' && {
               retrieval_mode: activeListViewState.retrievalMode,
             }),
+          ...(activeListViewState.semanticThreshold !== undefined &&
+            activeListViewState.semanticThreshold !== null &&
+            activeListViewState.semanticThreshold !== '' && {
+              semantic_threshold: activeListViewState.semanticThreshold,
+            }),
         }
       )
       .pipe(takeUntil(this.unsubscribeNotifier))
@@ -443,6 +454,17 @@ export class DocumentListViewService {
 
   get retrievalMode(): string {
     return this.activeListViewState.retrievalMode ?? 'default'
+  }
+
+  setSemanticThreshold(threshold: string | number | null) {
+    this.activeListViewState.semanticThreshold = threshold
+    this.markChanged()
+    this.reload()
+    this.saveDocumentListView()
+  }
+
+  get semanticThreshold(): string | number | null {
+    return this.activeListViewState.semanticThreshold ?? null
   }
 
   get filterRules(): FilterRule[] {
